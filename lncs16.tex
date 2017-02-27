@@ -118,6 +118,7 @@ However, these methods either need additional preprocessing or have special requ
 Recently, researchers begin to use SIMD instructions to boost the intersection performance \cite{Inoue2014Faster,Schlegel2010Fast,lemire2016simd}.
 By exploiting the code-level parallelism and larger registers, SIMD-based methods are able to compare 4 or more elements at a time, and have shown substantial improvements over the scalar instructions.
 % XXX：simply desccibe these simd-based method? for example???
+% SIMD实际上是zipper的并行化形式
 Unfortunately, these methods only focus on the intersection of two sets, the way they execute the computation is more like vectorized \texttt{Zipper}, which restricts their scope of application to the sets with similar length and large selectivity.
 Missing from the literature is a thorough empirical study that deploys SIMD instructions into multiple sets intersection algorithms and extensively measures their computation performances.
 
@@ -125,12 +126,12 @@ Missing from the literature is a thorough empirical study that deploys SIMD inst
 In this paper, we 
 %使用特殊结构treap,waveltertree
 %重排序，eliminator和search algorithm在哪里说，full mathch &mismatch intro还是决定在related work
-% SIMD实际上是zipper的并行化形式
 %20倍，navarro2010dual
 %不同最优时间复杂度的方法也相继提出
 %分类，按类型，按时代
  
 \section{Related Work}\label{sec:related work}
+
 \section{Preliminary Experiment}
 \subsection{Dataset Setup}
 % use synthetic data rather than real-world data
