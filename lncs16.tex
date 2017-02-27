@@ -39,6 +39,7 @@
 
 % first the title is needed
 \title{Accelerating Multiple Sets Intersection with SIMD Instructions}
+%XXX: An Insight into the Code-level Paralellism of Multiple Sets Intersection
 
 % a short form should be given in case it is too long for the running head
 \titlerunning{Accelerating Multiple Sets Intersection with SIMD Instructions}
@@ -109,41 +110,29 @@ Another model is called Holistic Intersection \cite{culpepper2010efficient}, nam
 The way these algorithms choose the searching element (called \textit{eliminator}) and how they search for it derives out a lot of varieties in the practical application.
 Examples are \texttt{set\_vs\_set}, \texttt{Adaptive} \cite{Barbay2006Faster,Demaine2000Adaptive,Demaine2001Experiments}, \texttt{Sequential} \cite{Barbay2002Adaptive,Barbay2003Optimality} and \texttt{MaxSuccessor} \cite{Culpepper2007Compact}.
 
-{\color{blue}Schlegel }{\color{red}Many approaches focus on
-speed up sequential intersection [4, 5, 9, 11, 13, 20] by using
-efficient data structures or improved processing techniques.
-Other approaches focus on utilizing modern hardware like
-graphic processors (GPUs) [1, 2, 12, 26, 27] and multi-core
-CPUs [23, 24] to utilize the parallelism offered by these processors. However, the main focus of these approaches is only
-on thread-level parallelism. Data-level parallelism is so far not considered although it is available via SIMD instruction
-sets in almost all modern CPUs. For this reason, our goal
-in this paper is to speed up the intersection of sorted sets
-using SIMD capabilities.}
+There also exist other approaches that try to solve the intersection problem from another perspectives.
+Some build auxiliary data structures like treaps \cite{Blelloch1998Fast,chen2016efficient}, wavelet trees \cite{navarro2010dual}, skipping lists \cite{Culpepper2007Compact,Moffat1996Self} and hash tables \cite{Arroyuelo2010Compressed,Sanders2007Intersection} to facilitate random access and avoid redundant comprisons.
+Some utilize modern hardware like GPU \cite{Ao2011Efficient,Wu2009A,Wu2010Efficient} or multi-core CPU \cite{Tatikonda2009On,tsirogiannis2009improving} to enable parallel processing.
+However, these methods either need additional preprocessing or have special requirements on the target sets \cite{Inoue2014Faster}.
 
-{\color{blue}Inoue }{\color{red}special data structures, such as hashbased structures [2, 3] or hierarchical data structures [4], can be
-used to boost performance by skipping redundant comparisons,
-especially when the sizes of the two input sets are significantly
-different. Unfortunately, such algorithms typically require
-preprocessing of the input data to represent it in a special form or
-to create additional data structures. Also, when the sizes of the
-two inputs are similar, it is much harder to achieve performance
-improvements because there are far fewer obviously redundant
-comparisons. As a result, simple merge-based implementations of
-set intersections are still widely used in the real world, such as the
-std::set\_intersection implementation of STL in C++. Our goal is
-to improve the performance of set intersection even when the two
-input sets are of comparable size without preprocessing.}
+Recently, researchers begin to use SIMD instructions to boost the intersection performance \cite{Inoue2014Faster,Schlegel2010Fast,lemire2016simd}.
+By exploiting the code-level parallelism and larger registers, SIMD-based methods are able to compare 4 or more elements at a time, and have shown substantial improvements over the scalar instructions.
+% XXX：simply desccibe these simd-based method? for example???
+Unfortunately, these methods only focus on the intersection of two sets, the way they execute the computation is more like vectorized \texttt{Zipper}, which restricts their scope of application to the sets with similar length and large selectivity.
+Missing from the literature is a thorough empirical study that deploys SIMD instructions into multiple sets intersection algorithms and extensively measures their computation performances.
 
+% 简述本文的工作，要不要按照点以item的形式列出来？
+In this paper, we 
 %使用特殊结构treap,waveltertree
-%重排序，eliminator和search algorithm在哪里说，full mathch &mismatch intro还是related work
+%重排序，eliminator和search algorithm在哪里说，full mathch &mismatch intro还是决定在related work
 % SIMD实际上是zipper的并行化形式
 %20倍，navarro2010dual
 %不同最优时间复杂度的方法也相继提出
 %分类，按类型，按时代
  
 \section{Related Work}\label{sec:related work}
-\subsection{Preliminary Experiment}
-\subsubsection{Dataset Setup}
+\section{Preliminary Experiment}
+\subsection{Dataset Setup}
 % use synthetic data rather than real-world data
 \section{SIMD Searching Algorithms}
 \section{Experiments}
