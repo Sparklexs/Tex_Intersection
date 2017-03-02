@@ -39,7 +39,7 @@
 
 % first the title is needed
 \title{Accelerating Multiple Sets Intersection with SIMD Instructions}
-%XXX: An Insight into the Code-level Paralellism of Multiple Sets Intersection
+%XXX: An Insight into the Code-level Parallelism of Multiple Sets Intersection
 
 % a short form should be given in case it is too long for the running head
 \titlerunning{Accelerating Multiple Sets Intersection with SIMD Instructions}
@@ -99,10 +99,9 @@ The earliest work can be dating back to decades ago \cite{Hwang1971Optimal,Hwang
 It is well known that there hardly exists a snake-oil method that suits for every scenario of intersections, the number of participating sets, the length ratio among them and the \textit{selectivity} (the ratio of intersection size to the smallest set size) will have tremendous impact on the efficiency of intersection algorithms.
 Besides, different algorithms have distinctive features and advantages.
 The straightforward method is called \texttt{Zipper} \cite{Sanders2007Intersection}, which works in a merge-wise fashion.
-Given two sets whose length are $ m $ and $ n $ respectively (we always assume $ m<n $), \texttt{Zipper} needs time $ O( m + n ) $ and works well if both lists are of similar length.
 Another algorithm that is designed for intersecting two sets is called \texttt{BaezaYates} \cite{Baeza2010Fast,Baezayates2004A,Baezayates2005Experimental}.
-It recursively bisects the longer subset using the median element of the smaller subset until any subset becomes empty, achieving $ O(m\log (n/m)) $ time complexity.
-The whole procedure works like the classic Quick Sort.
+It is an divide-and-conquer binary intersection approach with $ O(m\log (n/m)) $ time complexity \cite{culpepper2010efficient}.
+Its whole procedure works like the classic Quick Sort.
 
 When it comes to the intersection of multiple sets, the comparison model begins to diverge, the first is called \texttt{small\_vs\_small}, each time the smallest sets is picked out, and in turn intersect it against each of the others, in increasing order of size.
 \texttt{Zipper} and \texttt{BaezaYates} can be seen as two special cases where the number of sets are two.
@@ -111,8 +110,9 @@ The way these algorithms choose the searching element (called \textit{eliminator
 Examples are \texttt{set\_vs\_set}, \texttt{Adaptive} \cite{Barbay2006Faster,Demaine2000Adaptive,Demaine2001Experiments}, \texttt{Sequential} \cite{Barbay2002Adaptive,Barbay2003Optimality} and \texttt{MaxSuccessor} \cite{Culpepper2007Compact}.
 
 There also exist other approaches that try to solve the intersection problem from another perspectives.
-Some build auxiliary data structures like treaps \cite{Blelloch1998Fast,chen2016efficient}, wavelet trees \cite{navarro2010dual}, skipping lists \cite{Culpepper2007Compact,Moffat1996Self} and hash tables \cite{Arroyuelo2010Compressed,Sanders2007Intersection} to facilitate random access and avoid redundant comprisons.
+Some build auxiliary data structures like treaps \cite{Blelloch1998Fast,chen2016efficient}, wavelet trees \cite{navarro2010dual}, skipping lists \cite{Culpepper2007Compact,Moffat1996Self} and hash tables \cite{Arroyuelo2010Compressed,Sanders2007Intersection,Ding2011Fast} to facilitate random access and avoid redundant comprisons.
 Some utilize modern hardware like GPU \cite{Ao2011Efficient,Wu2009A,Wu2010Efficient} or multi-core CPU \cite{Tatikonda2009On,tsirogiannis2009improving} to enable parallel processing.
+Takuma and Yanagisawa propose two hash-based data structures to fast estimate the selectivity rather than return the exact intersection \cite{Takuma2013Faster}.
 However, these methods either need additional preprocessing or have special requirements on the target sets \cite{Inoue2014Faster}.
 
 Recently, researchers begin to use SIMD instructions to boost the intersection performance \cite{Inoue2014Faster,Schlegel2010Fast,lemire2016simd}.
@@ -123,15 +123,69 @@ Unfortunately, these methods only focus on the intersection of two sets, the way
 Missing from the literature is a thorough empirical study that deploys SIMD instructions into multiple sets intersection algorithms and extensively measures their computation performances.
 
 % 简述本文的工作，要不要按照点以item的形式列出来？
-In this paper, we 
+In this paper, we first provide a review of the former multiple sets intersection algorithms and recent SIMD-based algorithms, then we study the impact of introducing SIMD instructions into multiple sets intersection algorithms
 %使用特殊结构treap,waveltertree
-%重排序，eliminator和search algorithm在哪里说，full mathch &mismatch intro还是决定在related work
-%20倍，navarro2010dual
 %不同最优时间复杂度的方法也相继提出
 %分类，按类型，按时代
  
 \section{Related Work}\label{sec:related work}
+%intersection研究由来已久，我们这里仅考虑msis，因为它是最常见最常用的处理模式，压缩模式以及添加附属结构那种的暂时不在研究范围内，因为这些功能在增加某一方面性能的同时，也会极大地限制它们在其他方面的应用
+The sorted set intersection problem has long been concerned in information retrieval and various algorithms have been proposed in the literature to attack this problem.
+Except for approaches that only estimating the selectivity of intersection, we only consider those return the exact results, since they are the most commonly required tasks in information systems.
+Also, compressed format or auxiliary data structures are not in consideration since they may limit the applicability of the intersection algorithms and data are always expanded to explicit values for random access in practice \cite{Culpepper2007Compact,Sanders2007Intersection}.
+%20倍，navarro2010dual
+% 多参考SIMD compression posting list和on efficiency
+% scalar algorithms
+% searching algorithms
+% vecotr algorithms
+% 抛出问题？
+\subsection{Multiple Sets Intersection}
+%重排序，eliminator和search algorithm在这里说，full mathch &mismatch intro还是决定在related work
+Traditional scalar algorithms focus on reducing the number of redundant comparisons \cite{Demaine2001Experiments,Barbay2006Faster,Inoue2014Faster,Schlegel2010Fast}.
+Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with length $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ x $ from one set $ S_i $ (called \textit{eliminator}), and use search algorithms \textit{F-Search} to find an element which is not less than $ x $ over the other sets.
+If all the other sets contain the same element, we call it a \textit{full match}, otherwise, a \textit{mismatch} happens.
+In any case, $ x $ has to be updated and the search recurs until any set has been traversed \cite{culpepper2010efficient}.
+\subsubsection{small\_vs\_small}
+% XXX: 应该采用2分类法，而不是这种分类法，一方面可以压缩篇幅，一方面有能更那两篇综述显示区分
+%之前已经说到zipper和by是两两相交的特例，只不过使用的search algorithm不同而已,20倍之后才使用binary search
+An intuitive method is \texttt{small\_vs\_small} (hereinafter referred to as \texttt{svs} for short).
+As mentioned before it works by iterating through two sets and pick out common elements, for multiple sets this procedure repeats between the result and the smallest of the rest sets.
+\texttt{Zipper} is a kind of \texttt{svs} which uses linear search as F-Search.
+Given two sets whose lengths are $ n_1 $ and $ n_2 $ respectively, \texttt{Zipper} needs time $ O( n_1 + n_2 ) $ and works well if both lists are of similar length.
+Literature reports that binary search only beats linear search on \texttt{svs} when the sets are 20 times or larger different in size \cite{navarro2010dual,Sanders2007Intersection}.
+Another implementation is \texttt{BaezaYates} (\texttt{bys} for short), which is based on binary searching the longer set for the median of the smaller set, if the median is found, it is added to the result set.
+Then each set is split into two parts and the subsets are handled as before, for each pair of the subsets, the longer one is recursively bisected by the median element of the smaller one until any subset becomes empty.
+It can be seen as a natural hybrid of binary search and \texttt{Zipper}, however with better worst and average time complexity \cite{Baeza2010Fast}.
+% XXX: holistic methods
+\subsubsection{set\_vs\_set}
+Methods henceforth fall into the category of holistic algorithms because they process all the sets simultaneously rather than two by two.
+Each time an eliminator is determined by one set and a F-Search is applied to the other sets iteratively to corroborate whether it is a full match of mismatch.
+These algorithms differ in the way they determine eliminator and the F-Search they applied.
+The Document-At-A-Time (DAAT) strategy in ranked query processing can be seen as a dual of holistic algorithms in Boolean query.
 
+A simple method is \texttt{set\_vs\_set} (\texttt{SvS} for shrot), each time it choose the eliminator from $ S_1 $ and binary search it against the others.
+However, this method fails to exploit the distribution bias among different sets.
+Since the search on the sorted sets starts from the last position and never looks back, the remaining size changes each time we update the eliminator, and eliminator from the real smallest set is expected to eliminate more mismatched elements in the other sets.
+Demaine et al. proposed a variant named \texttt{Swapping\_SvS} which adds a sentinel at the update of eliminator to survillence the size change of each set, guaranteeing the eliminator is always picked from the smallest set \cite{Demaine2001Experiments}.
+\subsubsection{Adaptive and Sequential}
+\texttt{Adaptive} and \texttt{Sequential} are two prevailing algorithms used for multiple sets intersection, they both use a one-sided binary search of ``galloping" search as F-Search.
+Namely galloping keeps doubling the step length of the search location until overshoots, then a binary search is applied in the current interval for the exact position.
+If a full match happens, the eliminator is picked from the next element of the current set, otherwise it is the right value that causes mismatch.
+The only difference between them is that \texttt{Adaptive} performs one single galloping step for each set while \texttt{Sequential} performs one entire gallop till overshoots.
+While the two algorithms have same theoretical time complexity, an experimental study shows that \texttt{Adaptive} performs well 
+when the intersection concentrates in a small range while \texttt{Sequential} is good at the situation where intersection contains a small number of comparisons \cite{Barbay2006Faster}.
+% 改进有small，expolation search
+Demaine et al. proposed a hybrid algorithm named \texttt{Small\_Adaptive}, which combines the best properties of \texttt{SvS} and \texttt{Adaptive} \cite{Demaine2001Experiments}.
+The sets are reordered based on the remaining size of each sets, and the eliminator is picked from the next value of the smallest one.
+Actually we can also augment \texttt{Sequential} with reordering functionality.
+\subsubsection{MaxSuccessor}
+%\subsubsection{BaezaYates}由于
+
+
+%这里仅对常用的scalar msis提供一个简单的介绍，for more detailed investigation we would like to recommand that the reads may refer to \cite{}
+The Performance of the abovementioned algorithms relies heavily on their searching algorithms.
+\subsection{Searching Algorithms}
+\subsection{SIMD Intersection}
 \section{Preliminary Experiment}
 \subsection{Dataset Setup}
 % use synthetic data rather than real-world data
@@ -151,8 +205,8 @@ Due to its simplicity and flexibility, inverted index gains much popularity amon
 
 While state-of-the-art encoders do obtain very good space-time trade-offs, we argue that one important evaluation criterion has been neglected is the compression speed of these methods\cite{manning2008introduction,silvestri2010vsencoding,yan2009inverted}. The reason can be attributed to the fact that index is always preprocessed offline before deployment, and once being taken into effect, update can be committed in an asynchronous and parallel manner. Therefore index designers usually traverse the sequences more than once to find the optimal parameters for space-efficiency gains, making index construction speed rather slow. However, timely update for unexpected queries is becoming more and more stringent in search engine, especially in twitter and other social network sites. Compression speed should also be an important factor to evaluate an index compression algorithm. Early techniques like Simple-9 and Simple-16\cite{anh2005inverted,anh2010index} evaluate all the possible schemes to decide the best partition, PFOR\cite{lemire2015decoding,yan2009inverted,zobel2006inverted} splits each sequence into blocks of fixed size (say, 128 integers) and goes over the whole block to decide the exception ratio and block width. In a nutshell, compression speed is compromised to achieve better space occupancy and decoding speed.
 
-Modern encoders are designed to compress lists of integers, that is the input posting list is split into blocks with fixed or variable lengths to be encoded. Intuitively, partitioning posting list aligning to its clustered distribution, can effectively minimize the compressed size while keeping partitions separately accessed. Works from 
 literature\cite{anh2004index,delbru2010adaptive,silvestri2010vsencoding}give another perspective on index compression. The integer sequence is considered a particular directed acyclic graph(DAG), the partitioning problem is then treated as optimal path finding problem, unfortunately the DAG is complete with $ \frac{n\left( n+1\right)}{2} = \Theta\left( n^{2}\right) $ edges, a trivial traversal may not suffice to obtain an efficient solution for this problem. Scheme from \cite{anh2004index} uses a \textit{greedy} mechanism to yield a sub-optimal partition with a small amount of effectiveness exchanged for speed of compression and ease of implementation. AFOR from \cite{delbru2010adaptive} computes the block partition by using a series of fixed-sized sliding windows over a block and determines the optimal configuration of frames and frame lengths of the current window. VSEncoding from \cite{silvestri2010vsencoding} finds the optimal partition by using a \textit{dynamic programming} approach and is said to be able to encode groups of integers beating the entropy of the gaps distribution. However, dynamic programming can be very inefficient since it needs to recalculate all the edges when a new vertex is added in the current graph, to mitigate this problem VSEncoding simply restricts the length of the longest block to \textit{h}, reducing its time complexity from $O(n^{2})$ to $O(nh)$, but barely satisfactory in practice.
+Modern encoders are designed to compress lists of integers, that is the input posting list is split into blocks with fixed or variable lengths to be encoded. Intuitively, partitioning posting list aligning to its clustered distribution, can effectively minimize the compressed size while keeping partitions separately accessed. Works from 
 
 Recently, Ottaviano overcomes this drawback by introducing a new compression scheme called Partitioned Elias-Fano Index (PEF)\cite{ottaviano2014partitioned}, in which a linear-time approximation algorithm is presented to find a solution at most $\left(1+\epsilon\right)$ times larger than the optimal one, for any given $\epsilon\in\left(0,1\right)$. Its core idea is to generate a pruned graph $\mathcal{G}_{\epsilon}$ in linear time directly without explicitly constructing the whole graph $\mathcal{G}$ which, otherwise, would require quadratic time. Edges with a heavy weight are dropped according to a predefined pruning policy, reducing the time and space complexities to linear at the cost of finding slightly suboptimal partitions. The same idea is also adopted in \cite{ferragina2011optimally}.
 
