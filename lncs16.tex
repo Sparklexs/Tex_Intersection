@@ -168,7 +168,7 @@ However, this method fails to exploit the distribution bias among different sets
 Since the search on the sorted sets starts from the last position and never looks back, the remaining size changes each time we update the eliminator, and eliminator from the real smallest set is expected to eliminate more mismatched elements in the other sets.
 Demaine et al. proposed a variant named \texttt{Swapping\_SvS} which adds a sentinel at the update of eliminator to survillence the size change of each set, guaranteeing the eliminator is always picked from the smallest set \cite{Demaine2001Experiments}.
 \subsubsection{Adaptive and Sequential}
-\texttt{Adaptive} and \texttt{Sequential} are two prevailing algorithms used for multiple sets intersection, they both use a one-sided binary search of ``galloping" search as F-Search.
+\texttt{Adaptive} \cite{Demaine2000Adaptive} and \texttt{Sequential} \cite{Barbay2006Faster} are two prevailing algorithms used for multiple sets intersection, they both use a one-sided binary search of ``galloping" search as F-Search.
 Namely galloping keeps doubling the step length of the search location until overshoots, then a binary search is applied in the current interval for the exact position.
 If a full match happens, the eliminator is picked from the next element of the current set, otherwise it is the right value that causes mismatch.
 The only difference between them is that \texttt{Adaptive} performs one single galloping step for each set while \texttt{Sequential} performs one entire gallop till overshoots.
@@ -179,12 +179,36 @@ Demaine et al. proposed a hybrid algorithm named \texttt{Small\_Adaptive}, which
 The sets are reordered based on the remaining size of each sets, and the eliminator is picked from the next value of the smallest one.
 Actually we can also augment \texttt{Sequential} with reordering functionality.
 \subsubsection{MaxSuccessor}
-%\subsubsection{BaezaYates}由于
+Since \texttt{Small\_Adaptive} introduces extra cost of sets reordering which might be nontrivial and \texttt{Adaptive} fails to exploit the advantage of the varying size when eliminating elements.
+Clupepper and Moffat proposed \texttt{MaxSuccessor} (\texttt{max} for short) to overcome such delimma \cite{Culpepper2007Compact}.
+Instead of reordering sets after each match, \texttt{max} chooses to continue the strict rotation from the current set.
+However, eliminator is first picked from the first set, then substituted by the larger one between the successor from the first set and the mismatched element from the current set.
 
+%这里仅对常用的scalar msis提供一个简单的介绍
+We have taken a quick glance at traditional scalar intersection algorithms and roughly divided them into two categories.
+For more detailed investigation we would like to recommend that the reads may refer to \cite{J2010An,culpepper2010efficient}.
+\subsection{Efficiency Factor Analysis}
+% eliminator的选择尽量大，尽量从短的里面选取，加入重排序而已
+The intersection is basically composed by the election of eliminator and its searching among the rest sets.
+For the first part, large elements or those from small sets are likely to eliminate more invalid ones and reduce redundant comparisons.
+Reordering used by \texttt{Swapping\_SvS} and \texttt{Small\_Adaptive} guarantees the eliminator comes from the real smallest set, however, introduces extra computation.
+The comparison used by \texttt{max} before updating the eliminator guarantees a larger one will be picked.
 
-%这里仅对常用的scalar msis提供一个简单的介绍，for more detailed investigation we would like to recommand that the reads may refer to \cite{}
-The Performance of the abovementioned algorithms relies heavily on their searching algorithms.
-\subsection{Searching Algorithms}
+The efficiency of the searching algorithms plays an important role on the performance of set intersection algorithms.
+Two well-known algorithms are linear search and binary search.
+% 这里想办法和上文的S_i统一
+If to find an element $ x $ at distance $ d $ from set $ S_i $, linear search requires exactly $ d $ comparisons and its average cost is $ O(n_i) $.
+It works well for short sets and those of similar length.
+For binary search, the average cost becomes $ 1 + \lfloor \log_2 n \rfloor $, and it suits for the situation where lengths vary widely.
+
+There exists numerous variations in the literature and each of them fits in a special scenario.
+Among these variations the frequently-used include galloping search, Golomb search, Fibonacci search and interpolation search.
+Galloping search takes $ \lfloor \log_2 d \rfloor $ iterations at the doubling phase and $ 1 + \lfloor \log_2 d \rfloor $ comparisons at the binary search phase, totally $ 1 + 2 \lfloor  \log_2 d \rfloor $.
+Assume the intersection size to be $ r $, for each set $ S_i \in S$, the optimal cost is $ O(r+r\log (n_i/r)) $.
+Golomb search replace the doubling search with a fixed-length skip (say $ b $ items), this algorithm iteratively advance $ b $ items until straddles, then revert to a binary search over the last $ b $ items.
+By tuning $ b =0.69(n_i/r) $, it reaches the same cost complexity as Galloping search \cite{Hwang1972A}.
+Fibonacci search is similar to binary search, instead of bisecting current interval each time, this algorithm divides it according to two adjacent Fibonacci numbers whose sum equals or approximate the interval.
+% 除此以外，还有基于hash，基于树
 \subsection{SIMD Intersection}
 \section{Preliminary Experiment}
 \subsection{Dataset Setup}
