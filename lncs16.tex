@@ -35,7 +35,7 @@
 
 \begin{document}
 
-\mainmatter  % start of an individual contribution
+\mainmatter % start of an individual contribution
 
 % first the title is needed
 \title{Accelerating Multiple Sets Intersection with SIMD Instructions}
@@ -115,7 +115,7 @@ Some utilize modern hardware like GPU \cite{Ao2011Efficient,Wu2009A,Wu2010Effici
 Takuma and Yanagisawa propose two hash-based data structures to fast estimate the selectivity rather than return the exact intersection \cite{Takuma2013Faster}.
 However, these methods either need additional preprocessing or have special requirements on the target sets \cite{Inoue2014Faster}.
 
-Recently, researchers begin to use SIMD instructions to boost the intersection performance \cite{Inoue2014Faster,Schlegel2010Fast,lemire2016simd}.
+Recently, researchers begin to use SIMD instructions to boost the intersection performance \cite{Inoue2014Faster,Schlegel2011Fast,lemire2016simd}.
 By exploiting the code-level parallelism and larger registers, SIMD-based methods are able to compare 4 or more elements at a time, and have shown substantial improvements over the scalar instructions.
 % XXX：simply desccibe these simd-based method? for example???
 % SIMD实际上是zipper的并行化形式
@@ -139,15 +139,16 @@ Also, compressed format or auxiliary data structures are not in consideration si
 % searching algorithms
 % vecotr algorithms
 % 抛出问题？
-\subsection{Multiple Sets Intersection}
-%重排序，eliminator和search algorithm在这里说，full mathch &mismatch intro还是决定在related work
-Traditional scalar algorithms focus on reducing the number of redundant comparisons \cite{Demaine2001Experiments,Barbay2006Faster,Inoue2014Faster,Schlegel2010Fast}.
-Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with length $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ x $ from one set $ S_i $ (called \textit{eliminator}), and use search algorithms \textit{F-Search} to find an element which is not less than $ x $ over the other sets.
+\subsection{Multiple Sets Intersection}\label{sec: msis}
+%重排序，eliminator和searching algorithm在这里说，full mathch &mismatch intro还是决定在related work
+% XXX:这一句话有点突兀，需要修改
+Traditional scalar algorithms focus on reducing the number of redundant comparisons \cite{Demaine2001Experiments,Barbay2006Faster,Inoue2014Faster,Schlegel2011Fast}.
+Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with length $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ x $ from one set $ S_i $ (called \textit{eliminator}), and use searching algorithms \textit{F-Search} to find an element which is not less than $ x $ over the other sets.
 If all the other sets contain the same element, we call it a \textit{full match}, otherwise, a \textit{mismatch} happens.
 In any case, $ x $ has to be updated and the search recurs until any set has been traversed \cite{culpepper2010efficient}.
 \subsubsection{small\_vs\_small}
 % XXX: 应该采用2分类法，而不是这种分类法，一方面可以压缩篇幅，一方面有能更那两篇综述显示区分
-%之前已经说到zipper和by是两两相交的特例，只不过使用的search algorithm不同而已,20倍之后才使用binary search
+%之前已经说到zipper和by是两两相交的特例，只不过使用的searching algorithm不同而已,20倍之后才使用binary search
 An intuitive method is \texttt{small\_vs\_small} (hereinafter referred to as \texttt{svs} for short).
 As mentioned before it works by iterating through two sets and pick out common elements, for multiple sets this procedure repeats between the result and the smallest of the rest sets.
 \texttt{Zipper} is a kind of \texttt{svs} which uses linear search as F-Search.
@@ -203,18 +204,62 @@ For binary search, the average cost becomes $ 1 + \lfloor \log_2 n \rfloor $, an
 
 There exists numerous variations in the literature and each of them fits in a special scenario.
 Among these variations the frequently-used include galloping search, Golomb search, Fibonacci search and interpolation search.
-Galloping search takes $ \lfloor \log_2 d \rfloor $ iterations at the doubling phase and $ 1 + \lfloor \log_2 d \rfloor $ comparisons at the binary search phase, totally $ 1 + 2 \lfloor  \log_2 d \rfloor $.
+\textbf{Galloping search} takes $ \lfloor \log_2 d \rfloor $ iterations at the doubling phase and $ 1 + \lfloor \log_2 d \rfloor $ comparisons at the binary search phase, totally $ 1 + 2 \lfloor \log_2 d \rfloor $.
 Assume the intersection size to be $ r $, for each set $ S_i \in S$, the optimal cost is $ O(r+r\log (n_i/r)) $.
-Golomb search replace the doubling search with a fixed-length skip (say $ b $ items), this algorithm iteratively advance $ b $ items until straddles, then revert to a binary search over the last $ b $ items.
+\textbf{Golomb search} replaces the doubling search with a fixed-length skip (say $ b $ items), this algorithm iteratively advance $ b $ items until straddles, then revert to a binary search over the last $ b $ items.
 By tuning $ b =0.69(n_i/r) $, it reaches the same cost complexity as Galloping search \cite{Hwang1972A}.
-Fibonacci search is similar to binary search, instead of bisecting current interval each time, this algorithm divides it according to two adjacent Fibonacci numbers whose sum equals or approximate the interval.
+\textbf{Fibonacci search} is similar to binary search, instead of bisecting current interval each time, this algorithm divides it according to two adjacent Fibonacci numbers whose sum equals or approximate the interval.
+It has the same time complexity as binary search (namely $ O(\log_2 n_i) $), however, performs slightly better on large sets in practice \cite{Kiefer1953Sequential}.
+\textbf{Interpolation search} uses a linear regression to predict the possible position of the target value, and needs $ O(\log_2\log_2 n_i) $ time when the set follows a uniform distribution.
+However, its performance is delayed by the complicated calculations and likely to be slower than binary search in practice.
+Recent studies proposed some faster variations like extrapolation search or utilizing GPUs \cite{Ao2011Efficient,Barbay2003Optimality}.
+
 % 除此以外，还有基于hash，基于树
-\subsection{SIMD Intersection}
+Besides, there are other searching algorithms like hashing, tree search and so on.
+However, these methods either need preprocessing or auxiliary data structures, and only support partial operations for intersection.
+\subsection{SIMD Based Intersection}
+Recently, researchers began to introduce SIMD instructions to bear on the problems in data management of Information Retrieval.
+Current work focus on two aspects: inverted index compression \cite{lemire2015decoding,stepanov2011simd,trotman2014compression} and sorted set intersection \cite{lemire2016simd,Inoue2014Faster,Schlegel2011Fast}.
+Taking advantage of the vector processing, these methods achieve much faster speed than those scalar ones.
+
+Schlegel et al. \cite{Schlegel2011Fast} explored the use of STTNI from Intel SSE 4.2.
+The specific instruction is \textsf{PCMPESTRM}, which is able to fully compare 16 8-bit or 8 16-bit integers within one call.
+Then the intersection between two sets is executed in a block-wise fashion rather than element-wise.
+For integers larger than $ 2^{16} $, they designed a hierarchical data structure to separately store the upper and lower 16 bits, which can be seen as a simplified Elias-Fano Index \cite{ottaviano2014partitioned,vigna2013quasi}.
+And the intersection only output a result when both parts are identical.
+%similar length, value domain, 重复比较，其实该指令代价也很高
+This technique only works on two sets with similar length and the value domain should be proportional to the lengths for efficient intersection.
+Despite the fact that \textsf{PCMPESTRM} execute an all-pairs comparison in one single call, it occupies much more cycles than regular SIMD instructions, and requires more comparisons than actually needed.
+
+Lemire et al. \cite{lemire2016simd} attacked this problem from a different aspect.
+Instead of comparing multiple elements in one time, their algorithms compare only one element from the smaller set against several adjacent elements from the larger set using SIMD instructions.
+They proposed 3 algorithms to fit in different scenarios of variable set sizes: V1, V3 and SIMD GALLOPING.
+These algorithms can be seen as a vectorized version of Golomb search.
+For each element in the small set, the pointer in the large set advances one or multiple blocks of elements until a block is reached, whose maximum value is at least as large as the one in the small set.
+Then a binary search is executed on the current interval until narrowing down to one exact block.
+Thus its elements can be simultaneously compared against the target one using SIMD instructions.
+Their methods are more scalable for different sets and data-type free.
+
+Inoue et al. \cite{Inoue2014Faster} exploited SIMD instructions to execute multiple comparisons in parallel and reduce branch mispredictions.
+They replaced the costly \textit{if\_greater} conditional branches with more efficient \textit{if\_equal} branches, and carefully regrouped elements of current block, thus comparing only a part of each element to filter out unequal ones, rather than simply adopting \textsf{PCMPESTRM} for a full comparison.
+Even though this method is suitable only for sets of similar length with small selectivity, experiments show it is faster than the previous two.
+They also proposed an adaptive scheme to dynamically change the intersection algorithm according the size ratio and the selectivity.
+
+% 这些方法都是zipper的并行化，并没有考虑sets数目超过2个的情况，在试验中也没有与之进行比较，当前的文献领域尚为空白
+The above three algorithms have made substantial efforts applying SIMD instruction to sorted sets intersection.
+However, they only consider intersecting two sets, and for multiple sets they simply imply the task can be done in a \texttt{svs} fashion.
+In realistic Boolean query, we cannot expect the querying sets are always limited to 2.
+And the algorithms by Schlegel and Inoue are more like vectorized \texttt{Zipper}, which suits solely for sets of similar length.
+These methods have not been evaluated for the intersection of multiple sets against the relevant algorithms mention in Sec~\ref{sec: msis}.
+For the above reasons, in the next sections we provide preliminary experiments on the abovementioned algorithms to test their performance on multiple sets.
+Then we propose our improvements on the .... and analysis on ....
 \section{Preliminary Experiment}
 \subsection{Dataset Setup}
 % use synthetic data rather than real-world data
 \section{SIMD Searching Algorithms}
 \section{Experiments}
+% 由于能够操作多个数组或者从数组不连续位置读取元素的simd指令尚未面世，为此我们只能从优化searching algorithms入手
+% 为了保证公平地比较算法的适用性，避免引入指令集所造成的误差，我们暂时使用128bit的寄存器（即XMM。YMM暂时不使用）
 % scalar指令效率比较
 % scalar/vector指令效率比较
 % SIMD分块大小
@@ -277,7 +322,7 @@ While PEF using Elias-Fano code gets an impressive compression performance, we a
 
 VSEncoding is similar to PFOR, however, it neither applies a fixed-sized block length nor appends a patch for outliers at the end of blocks. In order to maximize the compression while retaining simple and fast decompression, VSEncoding partitions each posting list into blocks of variable length, and binary packs the integers inside of each block with the number of bits, say \textit{b}, required to encode the largest one. Finally the the value of \textit{b} and the length of the block, \textit{k}, are encoded using distinct encoders $ \mathcal{M}_{1} $ and $ \mathcal{M}_{2} $. The basic form of each block can be seen as $ \{<k_{i},b_{i}>: data_{i}\}_{block_{i}} $, $ data_{i} $ is the $ k_{i} $ integers of $ block_{i} $ using $ b_{i} $ bits each.
 
-Given a sequence $\mathcal{S}$ and a vector of partitions, the number of bits required to encode $\mathcal{S}$ can be computed in constant time, this quantity is calculated by summing up the costs of all the blocks, as the length of each block is variable, the problem of minimizing bits used relies on the problem of finding the optimal partitions. Let \textit{P} denote the vector of \textit{m} vertexes indicating the boundary of each block, with $ P\left[ 0 \right]  = 1 $, and $ P\left[ m \right]  = n $. The problem can be represented as follow:
+Given a sequence $\mathcal{S}$ and a vector of partitions, the number of bits required to encode $\mathcal{S}$ can be computed in constant time, this quantity is calculated by summing up the costs of all the blocks, as the length of each block is variable, the problem of minimizing bits used relies on the problem of finding the optimal partitions. Let \textit{P} denote the vector of \textit{m} vertexes indicating the boundary of each block, with $ P\left[ 0 \right] = 1 $, and $ P\left[ m \right] = n $. The problem can be represented as follow:
 \begin{equation*}
 \min_{P\in\mathcal{S}}\sum_{i=0}^{m-1}c\left(P\left[i\right]-1,P\left[i+1\right]\right )
 \end{equation*}
@@ -289,10 +334,10 @@ To further improve decompression speed and keep the block representations word a
 
 \subsection{Optimized Partitioning Strategy}
 
-Next we describe our modification to VSEncoding that achieve significant improvements over its original version in \cite{silvestri2010vsencoding}. As mentioned before dynamic programming used in optimal partitioning costs too much time of index compression, to overcome this problem, we present a new partitioning scheme, which uses approximation algorithm in place of dynamic programming, thus reducing the time and space complexities to linear by finding a suboptimal partition. The partitioning problem can be reduced  to SSSP over a DAG $\mathcal{G}$ with $\Theta\left(n^{2}\right)$ edges, and its time complexity is proportional to the number of edges,
+Next we describe our modification to VSEncoding that achieve significant improvements over its original version in \cite{silvestri2010vsencoding}. As mentioned before dynamic programming used in optimal partitioning costs too much time of index compression, to overcome this problem, we present a new partitioning scheme, which uses approximation algorithm in place of dynamic programming, thus reducing the time and space complexities to linear by finding a suboptimal partition. The partitioning problem can be reduced to SSSP over a DAG $\mathcal{G}$ with $\Theta\left(n^{2}\right)$ edges, and its time complexity is proportional to the number of edges,
 our aim is to design a pruning strategy removing edges of large costs while retaining edges which costs no more than $\left(1+\epsilon \right)$ times what the shortest paths do, for any given $\epsilon\in\left(0,1\right)$.
 
-We use $c\left(v_{i},v_{j}\right)$ to denote the cost function of the edge $\left(v_{i},v_{j}\right)$, which is also the cost of a partition  $\mathcal{S}\left[i,j-1 \right]$, $U$ as the upper bound of cost by representing $\mathcal{S}$ as a single partition, and $F$ as the fixed cost of each partition(e.g. the descriptor). There is an obvious fact that, given any $0\leqslant i < j < k \leqslant n$, it is $ 0 < c\left(v_{i},v_{j}\right)\leqslant c\left(v_{i},v_{k}\right)\leqslant \ldots \leqslant c\left(v_{i},v_{n+1}\right)$.
+We use $c\left(v_{i},v_{j}\right)$ to denote the cost function of the edge $\left(v_{i},v_{j}\right)$, which is also the cost of a partition $\mathcal{S}\left[i,j-1 \right]$, $U$ as the upper bound of cost by representing $\mathcal{S}$ as a single partition, and $F$ as the fixed cost of each partition(e.g. the descriptor). There is an obvious fact that, given any $0\leqslant i < j < k \leqslant n$, it is $ 0 < c\left(v_{i},v_{j}\right)\leqslant c\left(v_{i},v_{k}\right)\leqslant \ldots \leqslant c\left(v_{i},v_{n+1}\right)$.
 
 By adopting a nontrivial pruning strategy a subgraph $\mathcal{G_{\varepsilon}}$ of the original $\mathcal{G}$ is produced, in which the shortest path and the suboptimal path which increases a little are preserved. Any edge $\left(v_{i},v_{j}\right)$ in $\mathcal{G_{\varepsilon}}$ follows at least one of the following conditions: 1) there exits a positive integer $k$ such that $c\left(v_{i},v_{j}\right) \leqslant F\left(1+\varepsilon\right)^{k} < c\left(v_{i},v_{j+1}\right)$\label{itm:property1}; 2)$j=n+1$. These edges of $\mathcal{G}_{\varepsilon}$ are called $ \varepsilon-maximal$ edges. As we have set the upper bound to $U$, there exists at most $\log_{1+\varepsilon}\frac{U}{F}$ possible values for $k$, thus for each vertex $\mathcal{G}_{\varepsilon}$ has at most $\log_{1+\varepsilon}\frac{U}{F}$ outgoing  $ \varepsilon-maximal$ edges. \cite{ferragina2011optimally} has proved that the shortest path distance on $\mathcal{G}_{\varepsilon}$, which is at most $\left(1+\varepsilon\right)$ times larger than the one in $\mathcal{G}$, can be computed in $O\left(n\log_{1+\varepsilon}\frac{U}{F}\right)$ time.
 
