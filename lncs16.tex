@@ -329,7 +329,7 @@ The partitioning procedure already compares and sorts the elements inside each s
 \section{Main Algorithms}
 As we have observed, the recent SIMD-based algorithms have low efficiency on large sets.
 In this section, we would like to introduce our optimization on traditional multiple sets intersection algorithms using SIMD instructions.
-From Sec.~\ref{sec: factor} we know the way to elect eliminator and searching algorithms are two factors that affect the overall efficiency.
+From Sec.~\ref{sec: factor} we know the way to elect eliminator and related searching algorithms are two factors that affect the overall efficiency.
 For now, processors only support loading continuous memory chunks into vector registers.
 Instructions that extract and gather data from separate chunks for each element of the sets are included only by AVX-512VL, which is not available yet.
 \begin{figure}
