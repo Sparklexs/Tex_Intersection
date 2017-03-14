@@ -96,7 +96,7 @@ Thus, conjunctive query \textit{q} is computing the intersection of $ |q| $ sets
 The inflating size of web data and users has brought intense pressure on the query processing speed of information systems, in order to alleviate this dichotomy, a lot of research has been done to improve the efficiency of set intersection.
 The earliest work can be dating back to decades ago \cite{Hwang1971Optimal,Hwang1972A}.
 
-It is well known that there hardly exists a snake-oil method that suits for every scenario of intersections, the number of participating sets, the length ratio among them and the \textit{selectivity} (the ratio of intersection size to the smallest set size) will have tremendous impact on the efficiency of intersection algorithms.
+It is well known that there hardly exists a snake-oil method that suits for every scenario of intersections, the number of participating sets, the size ratio among them and the \textit{selectivity} (the ratio of intersection size to the smallest set size) will have tremendous impact on the efficiency of intersection algorithms.
 Besides, different algorithms have distinctive features and advantages.
 The straightforward method is called \texttt{Zipper} \cite{Sanders2007Intersection}, which works in a merge-wise fashion.
 Another algorithm that is designed for intersecting two sets is called \texttt{BaezaYates} \cite{Baeza2010Fast,Baezayates2004A,Baezayates2005Experimental}.
@@ -119,7 +119,7 @@ Recently, researchers begin to use SIMD instructions to boost the intersection p
 By exploiting the code-level parallelism and larger registers, SIMD-based methods are able to compare 4 or more elements at a time, and have shown substantial improvements over the scalar instructions.
 % XXX：simply desccibe these simd-based method? for example???
 % SIMD实际上是zipper的并行化形式
-Unfortunately, these methods only focus on the intersection of two sets, the way they execute the computation is more like vectorized \texttt{Zipper}, which restricts their scope of application to the sets with similar length and large selectivity.
+Unfortunately, these methods only focus on the intersection of two sets, the way they execute the computation is more like vectorized \texttt{Zipper}, which restricts their scope of application to the sets with similar size and large selectivity.
 Missing from the literature is a thorough empirical study that deploys SIMD instructions into multiple sets intersection algorithms and extensively measures their computation performances.
 
 % 简述本文的工作，要不要按照点以item的形式列出来？
@@ -143,7 +143,7 @@ Also, compressed format or auxiliary data structures are not in consideration si
 %重排序，eliminator和searching algorithm在这里说，full mathch &mismatch intro还是决定在related work
 % XXX:这一句话有点突兀，需要修改
 Traditional scalar algorithms focus on reducing the number of redundant comparisons \cite{Demaine2001Experiments,Barbay2006Faster,Inoue2014Faster,Schlegel2011Fast}.
-Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with length $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ x $ from one set $ S_i $ (called \textit{eliminator}), and use searching algorithms \textit{F-Search} to find an element which is not less than $ x $ over the other sets.
+Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with size $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ x $ from one set $ S_i $ (called \textit{eliminator}), and use searching algorithms \textit{F-Search} to find an element which is not less than $ x $ over the other sets.
 If all the other sets contain the same element, we call it a \textit{full match}, otherwise, a \textit{mismatch} happens.
 In any case, $ x $ has to be updated and the search recurs until any set has been traversed \cite{culpepper2010efficient}.
 \subsubsection{small\_vs\_small}
@@ -152,7 +152,7 @@ In any case, $ x $ has to be updated and the search recurs until any set has bee
 An intuitive method is \texttt{small\_vs\_small} (hereinafter referred to as \texttt{svs} for short).
 As mentioned before it works by iterating through two sets and pick out common elements, for multiple sets this procedure repeats between the result and the smallest of the rest sets.
 \texttt{Zipper} is a kind of \texttt{svs} which uses linear search as F-Search.
-Given two sets whose lengths are $ n_1 $ and $ n_2 $ respectively, \texttt{Zipper} needs time $ O( n_1 + n_2 ) $ and works well if both lists are of similar length.
+Given two sets whose sizes are $ n_1 $ and $ n_2 $ respectively, \texttt{Zipper} needs time $ O( n_1 + n_2 ) $ and works well if both lists are of similar size.
 Literature reports that binary search only beats linear search on \texttt{svs} when the sets are 20 times or larger different in size \cite{navarro2010dual,Sanders2007Intersection}.
 Another implementation is \texttt{BaezaYates} (\texttt{bys} for short), which is based on binary searching the longer set for the median of the smaller set, if the median is found, it is added to the result set.
 Then each set is split into two parts and the subsets are handled as before, for each pair of the subsets, the longer one is recursively bisected by the median element of the smaller one until any subset becomes empty.
@@ -188,7 +188,7 @@ However, eliminator is first picked from the first set, then substituted by the 
 %这里仅对常用的scalar msis提供一个简单的介绍
 We have taken a quick glance at traditional scalar intersection algorithms and roughly divided them into two categories.
 For more detailed investigation we would like to recommend that the reads may refer to \cite{J2010An,culpepper2010efficient}.
-\subsection{Efficiency Factor Analysis}
+\subsection{Efficiency Factor Analysis}\label{sec: factor}
 % eliminator的选择尽量大，尽量从短的里面选取，加入重排序而已
 The intersection is basically composed by the election of eliminator and its searching among the rest sets.
 For the first part, large elements or those from small sets are likely to eliminate more invalid ones and reduce redundant comparisons.
@@ -199,15 +199,15 @@ The efficiency of the searching algorithms plays an important role on the perfor
 Two well-known algorithms are linear search and binary search.
 % 这里想办法和上文的S_i统一
 If to find an element $ x $ at distance $ d $ from set $ S_i $, linear search requires exactly $ d $ comparisons and its average cost is $ O(n_i) $.
-It works well for short sets and those of similar length.
-For binary search, the average cost becomes $ 1 + \lfloor \log_2 n \rfloor $, and it suits for the situation where lengths vary widely.
+It works well for short sets and those of similar size.
+For binary search, the average cost becomes $ 1 + \lfloor \log_2 n \rfloor $, and it suits for the situation where sizes vary widely.
 
 There exists numerous variations in the literature and each of them fits in a special scenario.
 Among these variations the frequently-used include galloping search, Golomb search, Fibonacci search and interpolation search.
 \textbf{Galloping search} takes $ \lfloor \log_2 d \rfloor $ iterations at the doubling phase and $ 1 + \lfloor \log_2 d \rfloor $ comparisons at the binary search phase, totally $ 1 + 2 \lfloor \log_2 d \rfloor $.
 Assume the intersection size to be $ r $, for each set $ S_i \in S$, the optimal cost is $ O(r+r\log (n_i/r)) $.
 \textbf{Golomb search} replaces the doubling search with a fixed-length skip (say $ b $ items), this algorithm iteratively advance $ b $ items until straddles, then revert to a binary search over the last $ b $ items.
-By tuning $ b =0.69(n_i/r) $, it reaches the same cost complexity as Galloping search \cite{Hwang1972A}.
+By tuning $ b =0.69(n_i/r) $, it reaches the same cost complexity as galloping search \cite{Hwang1972A}.
 \textbf{Fibonacci search} is similar to binary search, instead of bisecting current interval each time, this algorithm divides it according to two adjacent Fibonacci numbers whose sum equals or approximate the interval.
 It has the same time complexity as binary search (namely $ O(\log_2 n_i) $), however, performs slightly better on large sets in practice \cite{Kiefer1953Sequential}.
 \textbf{Interpolation search} uses a linear regression to predict the possible position of the target value, and needs $ O(\log_2\log_2 n_i) $ time when the set follows a uniform distribution.
@@ -228,12 +228,12 @@ Then the intersection between two sets is executed in a block-wise fashion rathe
 For integers larger than $ 2^{16} $, they designed a hierarchical data structure to separately store the upper and lower 16 bits, which can be seen as a simplified Elias-Fano Index \cite{ottaviano2014partitioned,vigna2013quasi}.
 And the intersection only output a result when both parts are identical.
 %similar length, value domain, 重复比较，其实该指令代价也很高
-This technique only works on two sets with similar length and the value domain should be proportional to the lengths for efficient intersection.
+This technique only works on two sets with similar size and the value domain should be proportional to the sizes for efficient intersection.
 Despite the fact that \textsf{PCMPESTRM} execute an all-pairs comparison in one single call, it occupies much more cycles than regular SIMD instructions, and requires more comparisons than actually needed.
 
 Lemire et al. \cite{lemire2016simd} attacked this problem from a different aspect.
 Instead of comparing multiple elements in one time, their algorithms compare only one element from the smaller set against several adjacent elements from the larger set using SIMD instructions.
-They proposed 3 algorithms to fit in different scenarios of variable set sizes: V1, V3 and SIMD GALLOPING.
+They proposed 3 algorithms to fit in different scenarios of variable set sizes: V1, V3 and SIMD Gallop.
 These algorithms can be seen as a vectorized version of Golomb search.
 For each element in the small set, the pointer in the large set advances one or multiple blocks of elements until a block is reached, whose maximum value is at least as large as the one in the small set.
 Then a binary search is executed on the current interval until narrowing down to one exact block.
@@ -242,25 +242,107 @@ Their methods are more scalable for different sets and data-type free.
 
 Inoue et al. \cite{Inoue2014Faster} exploited SIMD instructions to execute multiple comparisons in parallel and reduce branch mispredictions.
 They replaced the costly \textit{if\_greater} conditional branches with more efficient \textit{if\_equal} branches, and carefully regrouped elements of current block, thus comparing only a part of each element to filter out unequal ones, rather than simply adopting \textsf{PCMPESTRM} for a full comparison.
-Even though this method is suitable only for sets of similar length with small selectivity, experiments show it is faster than the previous two.
+Even though this method is suitable only for sets of similar size with small selectivity, experiments show it is faster than the previous two.
 They also proposed an adaptive scheme to dynamically change the intersection algorithm according the size ratio and the selectivity.
 
 % 这些方法都是zipper的并行化，并没有考虑sets数目超过2个的情况，在试验中也没有与之进行比较，当前的文献领域尚为空白
 The above three algorithms have made substantial efforts applying SIMD instruction to sorted sets intersection.
 However, they only consider intersecting two sets, and for multiple sets they simply imply the task can be done in a \texttt{svs} fashion.
 In realistic Boolean query, we cannot expect the querying sets are always limited to 2.
-And the algorithms by Schlegel and Inoue are more like vectorized \texttt{Zipper}, which suits solely for sets of similar length.
-These methods have not been evaluated for the intersection of multiple sets against the relevant algorithms mention in Sec~\ref{sec: msis}.
+And the algorithms by Schlegel and Inoue are more like vectorized \texttt{Zipper}, which suits solely for sets of similar size.
+These methods have not been evaluated for the intersection of multiple sets against the relevant algorithms mention in Sec.~\ref{sec: msis}.
 For the above reasons, in the next sections we provide preliminary experiments on the abovementioned algorithms to test their performance on multiple sets.
 Then we propose our improvements on the .... and analysis on ....
 \section{Preliminary Experiment}
-We first compare
-\subsection{Dataset Setup}
+Before further exploring the optimization on multiple sets intersection, we first declare our data setup, which we also use in the later sections.
+Then we execute preliminary experiments on the algorithms mentioned in Sec.~\ref{sec:related work} to validate their performances on different scenarios.
+
+\subsection{Dataset and Setup}
 % use synthetic data rather than real-world data
-\section{SIMD Searching Algorithms}
-\section{Experiments}
+As our goal is to find an efficient algorithm for Boolean query in the search engine, and the data is stored as sorted integers in the inverted index.
+We choose to use random generated integers to form the sorted sets, in the same way as Baeza Yates and Salinger \cite{Baezayates2005Experimental} and Barbey et al. \cite{J2010An} did.
+Since the crawled data and queries from real world may have some biases, the synthetic data are expected to cover more situations of intersection.
+The integers are uniformly distributed in the range $ [0,2^{32}-1] $, the number of sets varies from 2 to 10 by 1.
+The smallest size of set keeps doubling from $ 2^{10} $ to $ 2^{14} $, and the size ratio between it and the largest size is set to be  $ 1, 10, 10^2, 10^3,$ and $ 10^4 $ respectively, other sizes are assigned randomly between them when the number is larger than 2.
+And for each specified configuration of the sets, we generate three instances of different selectivity: 10\%, 50\% and 100\%.
+
+The sets are generated according to the following steps: we first generate the result set according to selectivity, then all the other sets are created on the basis of the result set to avoid additional intersection, and their sizes are strictly bounded by the predefined smallest and largest sizes.
+
+All the implementations are carried out on a PC server with an 4 core Intel(r) Core(r) i5-4590 processor running at 3.30 GHz, with 16GB of RAM and 6MB of cache. Our algorithm is compiled with G++ 4.8.1 with -O3 optimizations. In all our runs, executions are reported as the mean of 5 consecutive replications.
+\subsection{title}
+\begin{figure}
+	\centering
+	\includegraphics[width=1.0\linewidth]{scalar}
+	\caption{Time cost in microseconds of intersection algorithms under different configurations}
+	\label{fig: scalar}
+\end{figure}
+First we show the Performances of scalar algorithms in Fig.~\ref{fig: scalar}.
+Since \texttt{adp} and \texttt{sql} have few differences and \texttt{sql} always outperforms \texttt{adp} in our experiments,we omit \texttt{adp} and \texttt{s\_adp} and replace them with \texttt{sql} and \texttt{s\_sql} instead.
+Fig.~\ref{fig: scalar} is arranged in two dimensions: rows represent selectivities and columns represent size ratios.
+As can be seen, selectivity hardly affects the performances.
+The overall trend stays nearly the same under different selectivities except that the time cost grows when selectivity becomes larger (Note \texttt{zip} is the only one that achieves faster speed).
+Size ratio plays an important role on the efficiency of different algorithms.
+As the size grows larger, time cost also tends to increase, however, \texttt{zip} performs the best when the size ratio is $ 1:1 $ and the worst in other cases (a more detailed investigation shows it is invincible until $ 1:20 $), demonstrating it only suits for sets of similar size.
+Other algorithms do not differ much from each other, we can see that reordering indeed increases the performance for \texttt{SvS} and \texttt{sql}.
+\texttt{max} is a quite stable method, it performs well in all conditions and \texttt{bys} works better when the size ratio grows larger, it becomes the best one in $ 1:10^4 $.
+Since selectivity hardly distinguishes these algorithms, in the following we only report the performances when selectivity equals 50\% for convenience.
+\begin{figure}
+	\centering
+	\includegraphics[width=1.0\linewidth]{simd_1}
+	\caption{Time cost in microseconds of SIMD-based intersection algorithms vs. \texttt{max} when selectivity=50\%}
+	\label{fig: simd_1}
+\end{figure}
+
+Fig.~\ref{fig: simd_1} shows the result of the recent SIMD-based algorithms vs. \texttt{max}.
+Specially, sets used for Schlegel have been partitioned to build a hierarchical structure since it only process integers small than $ 2^{16} $.
+As expected, SIMD-based algorithms which work in vectorized \texttt{zip} fashion only performs well when the set sizes are similar.
+In other cases, too many invalid comparisons will sharply slow down their performances and \texttt{max} outperforms them easily.
+On the contrary, SIMD Gallop suits ideally when size ratio grows larger, but only outperforms \texttt{max} by a small margin.
+Performance of Schlegel gets well for multiple sets and large size ratio, the main reason is that it benefits much from the preprocessing.
+The partitioning procedure already compares and sorts the elements inside each sets, and it also takes much time, however, does not taken into account for intersection. 
+%\begin{table}
+%	\caption[?]{in microseconds.}
+%	\begin{center}
+%		\renewcommand{\arraystretch}{1}
+%		\setlength\tabcolsep{3pt}
+%		\begin{tabular}{c*{4}{*{3}rrr}}
+%			\toprule
+%			\multirow{5}*{\textsf{methods}}& \multicolumn{12}{c}{\textsf{size ratio}} \\
+%			\cmidrule(lr){2-13}
+%			& \multicolumn{3}{c}{1:1} & \multicolumn{3}{c}{1:$ 10^2 $} & \multicolumn{3}{c}{1:$ 10^3 $} & \multicolumn{3}{c}{1:$ 10^4 $}\\
+%			\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-13}
+%			& \multicolumn{3}{c}{\textsf{selectivity}} & \multicolumn{3}{c}{\textsf{selectivity}} & \multicolumn{3}{c}{\textsf{selectivity}} & \multicolumn{3}{c}{\textsf{selectivity}}\\ 
+%			& 10\% & 50\% & 100\% & 10\% & 50\% & 100\% & 10\% & 50\% & 100\% & 10\% & 50\% & 100\% \\
+%			\midrule
+%	\texttt{Zipper} &\textbf{45.6} &\textbf{63.3} &\textbf{26.7} &2103.3&2088.9&2228.9&17448.8&17599.9&20806.8&182045.0&178150.1&205375.1\\      
+%	\texttt{bys}    &92.2 &228.9&243.3&267.8 &640.0 &846.7 &666.7  &1750.0 &2332.2 &\textbf{1482.2}  &\textbf{3695.6}  &\textbf{4903.4}  \\      
+%	\texttt{SvS}    &80.0 &194.4&227.9&262.2 &753.3 &1108.9&836.7  &2248.9 &3352.2 &1854.4  &4741.1  &6570.3  \\      
+%	\texttt{s\_SvS} &168.9&235.6&178.9&373.3 &812.2 &1067.8&962.2  &2284.4 &3320.0 &1956.7  &4777.8  &6563.7  \\      
+%	\texttt{sql}    &96.7 &241.1&275.6&757.8 &1016.7&886.7 &2953.3 &2971.1 &2427.8 &6448.0  &6573.6  &5157.9  \\      
+%	\texttt{s\_sql} &157.8&220.0&182.2&308.9 &610.0 &717.8 &732.2  &1717.8 &\textbf{2180.0} &1564.4  &3866.7  &4945.7  \\      
+%	\texttt{max}    &64.4 &138.9&118.9&\textbf{226.7} &\textbf{552.2} &\textbf{688.9} &\textbf{582.2}  &\textbf{1680.0} &2208.9 &1545.6  &3852.2  &4975.7  \\      
+%			\bottomrule
+%			\label{tab: scalar}
+%		\end{tabular}
+%	\end{center}
+%\end{table} 
+\section{Main Algorithms}
+As we have observed, the recent SIMD-based algorithms have low efficiency on large sets.
+In this section, we would like to introduce our optimization on traditional multiple sets intersection algorithms using SIMD instructions.
+From Sec.~\ref{sec: factor} we know the way to elect eliminator and searching algorithms are two factors that affect the overall efficiency.
+For now, processors only support loading continuous memory chunks into vector registers.
+Instructions that extract and gather data from separate chunks for each element of the sets are included only by AVX-512VL, which is not available yet.
+\begin{figure}
+	\centering
+	\includegraphics[width=1.0\linewidth]{simd_me}
+	\caption{Time cost in microseconds of SIMD-based intersection algorithms vs. \texttt{max} when selectivity=50\%}
+	\label{fig: simd_me}
+\end{figure}
+% online rescource
 % 由于能够操作多个数组或者从数组不连续位置读取元素的simd指令尚未面世，为此我们只能从优化searching algorithms入手
 % 为了保证公平地比较算法的适用性，避免引入指令集所造成的误差，我们暂时使用128bit的寄存器（即XMM。YMM暂时不使用）
+% Golomb Search and Gallop Search
+\section{Experiments}
 % scalar指令效率比较
 % scalar/vector指令效率比较
 % SIMD分块大小
