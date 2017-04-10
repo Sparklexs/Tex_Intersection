@@ -29,6 +29,7 @@
 \usepackage{subfigure}
 \usepackage{url}
 \usepackage{multirow,booktabs,makecell,color,colortbl}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
  
 \newcommand{\keywords}[1]{\par\addvspace\baselineskip
 \noindent\keywordname\enspace\ignorespaces#1}
@@ -132,7 +133,8 @@ In this paper, we first provide a review of the former multiple sets intersectio
 %intersection研究由来已久，我们这里仅考虑msis，因为它是最常见最常用的处理模式，压缩模式以及添加附属结构那种的暂时不在研究范围内，因为这些功能在增加某一方面性能的同时，也会极大地限制它们在其他方面的应用
 The sorted set intersection problem has long been concerned in information retrieval and various algorithms have been proposed in the literature to attack this problem.
 Except for approaches that only estimating the selectivity of intersection, we only consider those return the exact results, since they are the most commonly required tasks in information systems.
-Also, compressed format or auxiliary data structures are not in consideration since they may limit the applicability of the intersection algorithms and data are always expanded to explicit values for random access in practice \cite{Culpepper2007Compact,Sanders2007Intersection}.
+Also, compressed format or auxiliary data structures are not in consideration, since they may limit the applicability of the intersection algorithms.
+And data are always expanded to explicit values for random access in practice \cite{Culpepper2007Compact,Sanders2007Intersection}.
 %20倍，navarro2010dual
 % 多参考SIMD compression posting list和on efficiency
 % scalar algorithms
@@ -143,7 +145,7 @@ Also, compressed format or auxiliary data structures are not in consideration si
 %重排序，eliminator和searching algorithm在这里说，full mathch &mismatch intro还是决定在related work
 % XXX:这一句话有点突兀，需要修改
 Traditional scalar algorithms focus on reducing the number of redundant comparisons \cite{Demaine2001Experiments,Barbay2006Faster,Inoue2014Faster,Schlegel2011Fast}.
-Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with size $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ x $ from one set $ S_i $ (called \textit{eliminator}), and use searching algorithms \textit{F-Search} to find an element which is not less than $ x $ over the other sets.
+Given sorted sets $ \{S_i|i\leqslant\lvert q \rvert\} $ with size $ n_1\leqslant n_2\leqslant\cdots\leqslant n_{\lvert q\rvert} $ for a query $ q $, the basic pattern to intersect is to select one element $ e $ from one set $ S_i $ (called \textit{eliminator}), and use searching algorithms \textit{F-Search} to find an element which is not less than $ e $ over the other sets.
 If all the other sets contain the same element, we call it a \textit{full match}, otherwise, a \textit{mismatch} happens.
 In any case, $ x $ has to be updated and the search recurs until any set has been traversed \cite{culpepper2010efficient}.
 \subsubsection{small\_vs\_small}
@@ -268,7 +270,9 @@ And for each specified configuration of the sets, we generate three instances of
 
 The sets are generated according to the following steps: we first generate the result set according to selectivity, then all the other sets are created on the basis of the result set to avoid additional intersection, and their sizes are strictly bounded by the predefined smallest and largest sizes.
 
-All the implementations are carried out on a PC server with an 4 core Intel(r) Core(r) i5-4590 processor running at 3.30 GHz, with 16GB of RAM and 6MB of cache. Our algorithm is compiled with G++ 4.8.1 with -O3 optimizations. In all our runs, executions are reported as the mean of 5 consecutive replications.
+All the implementations are carried out on a PC server with an 4 core Intel(r) Core(r) i5-4590 processor running at 3.30 GHz, with 16GB of RAM and 6MB of cache.
+Although recent instructions are more powerful to support larger registers (YMM of 256 bits and ZMM of 512 bits), in our experiments we only use 128-bit regisers (XMM) to avoid introducing extra performance errors with previous algorithms.
+Our algorithm is compiled with G++ 4.8.1 with -O3 optimizations. In all our runs, executions are reported as the mean of 5 consecutive replications.
 \subsection{title}
 \begin{figure}
 	\centering
@@ -331,17 +335,15 @@ As we have observed, the recent SIMD-based algorithms have low efficiency on lar
 In this section, we would like to introduce our optimization on traditional multiple sets intersection algorithms using SIMD instructions.
 From Sec.~\ref{sec: factor} we know the way to elect eliminator and related searching algorithms are two factors that affect the overall efficiency.
 For now, processors only support loading continuous memory chunks into vector registers.
-Instructions that extract and gather data from separate chunks for each element of the sets are included only by AVX-512VL, which is not available yet.
+Instructions that extract and gather data from separate chunks for each element of the sets are included only by AVX-512VL, which is not available yet \cite{Schlegel2011Fast}.
+So we only consider modifying the searching algorithms, among which Golomb Search and Gallop Search are two methods closely related to vector processing, they 
+% Golomb Search and Gallop Search
 \begin{figure}
 	\centering
 	\includegraphics[width=1.0\linewidth]{simd_me}
 	\caption{Time cost in microseconds of SIMD-based intersection algorithms vs. \texttt{max} when selectivity=50\%}
 	\label{fig: simd_me}
 \end{figure}
-% online rescource
-% 由于能够操作多个数组或者从数组不连续位置读取元素的simd指令尚未面世，为此我们只能从优化searching algorithms入手
-% 为了保证公平地比较算法的适用性，避免引入指令集所造成的误差，我们暂时使用128bit的寄存器（即XMM。YMM暂时不使用）
-% Golomb Search and Gallop Search
 \section{Experiments}
 % scalar指令效率比较
 % scalar/vector指令效率比较
@@ -352,6 +354,34 @@ Instructions that extract and gather data from separate chunks for each element 
 % 比较次数统计
 % SIMD指令使用比例
 \section{Conclusions and Future Work}
+
+\begin{algorithm} \label{alg: merge blocks}
+	%	\SetAlgoNoLine
+	\caption{Multiple Sets Intersection Algorithm Pseudo Code}
+	\KwIn{A list of $ |q| $ ordered inverted lists $ S_1,\dots,S_{|q|} $.
+	}
+	\KwOut{An orderted lists of answer $ A $.}
+	$ i = 0; e = S_1[0] $\;
+	\While{$ S_i $ is not empty}{
+		use \textit{\textbf{F-Search}} to find the minimum value $ x $ which is not less than $ e $\;
+		\If{$ x == e $}{
+			increase the occurrence counter\;
+			\If{the count reaches $ |q| $}{
+				add $ e $ to the result set $ A $\;
+				\textit{\textbf{update}} $ e $\;
+				}
+			\Else{
+			$ i = i $++$ \mod |q| $\;
+			\textbf{continue}\;	
+				}
+			}
+		\Else{
+			\textit{\textbf{update}} $ e $\;	
+			}
+			$ i = i $++$ \mod |q| $\;
+		}
+	\textbf{return} $ A $\;
+\end{algorithm}
 
 Due to its simplicity and flexibility, inverted index gains much popularity among modern IR systems since 1950s. Especially in large scale search engines, inverted index is now adopted as their core component to maintain billions of documents and respond to enormous queries. In its most basic and popular form, an inverted index is a collection of sorted sequences of integers\cite{manning2008introduction,witten1999managing,zobel2006inverted}. Growing size of data and stringent query processing efficiency requirement have appealed a large amount of research, with the aim to compress the space occupancy of the index and speed up the query processing.
 
