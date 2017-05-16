@@ -23,7 +23,7 @@
 \setcounter{tocdepth}{3}
 
 \usepackage{graphicx}
-\graphicspath{{./pdf/}}
+\graphicspath{{../pdf/}}
 \DeclareGraphicsExtensions{.pdf}
 
 \usepackage{subfigure}
@@ -90,7 +90,7 @@ In this article, we first revise all the
 
 \section{Introduction}\label{sec:introduction}
 Conjunctive Boolean query is a common operation in information retrieval, it provides infrastructure for many complicated queries like ranked query or fuzzy query.
-Namely, conjunctive query is to extract common elements from target sets and is widely used for document retrieval or text searching.
+Namely, conjunctive query is to extract common elements from target sets and widely used for document retrieval or text searching.
 In nowadays information systems, inverted index is a prevailing data structure that has been generally applied for storage and query processing \cite{culpepper2010efficient,zobel2006inverted}.
 An Inverted index can be seen as a big table mapping each unique \textit{term} to a \textit{posting list} which contains all the occurring document identifiers.
 Thus, conjunctive query \textit{q} is computing the intersection of $ |q| $ sets of sorted integers.
@@ -166,7 +166,7 @@ Each time an eliminator is determined by one set and a F-Search is applied to th
 These algorithms differ in the way they determine eliminator and the F-Search they applied.
 The Document-At-A-Time (DAAT) strategy in ranked query processing can be seen as a dual of holistic algorithms in Boolean query.
 
-A simple method is \texttt{set\_vs\_set} (\texttt{SvS} for shrot), each time it choose the eliminator from $ S_1 $ and binary search it against the others.
+A simple method is \texttt{set\_vs\_set} (\texttt{SvS} for shrot), each time it chooses the eliminator from $ S_1 $ and binary search it against the others.
 However, this method fails to exploit the distribution bias among different sets.
 Since the search on the sorted sets starts from the last position and never looks back, the remaining size changes each time we update the eliminator, and eliminator from the real smallest set is expected to eliminate more mismatched elements in the other sets.
 Demaine et al. proposed a variant named \texttt{Swapping\_SvS} which adds a sentinel at the update of eliminator to survillence the size change of each set, guaranteeing the eliminator is always picked from the smallest set \cite{Demaine2001Experiments}.
@@ -175,8 +175,7 @@ Demaine et al. proposed a variant named \texttt{Swapping\_SvS} which adds a sent
 Namely galloping keeps doubling the step length of the search location until overshoots, then a binary search is applied in the current interval for the exact position.
 If a full match happens, the eliminator is picked from the next element of the current set, otherwise it is the right value that causes mismatch.
 The only difference between them is that \texttt{Adaptive} performs one single galloping step for each set while \texttt{Sequential} performs one entire gallop till overshoots.
-While the two algorithms have same theoretical time complexity, an experimental study shows that \texttt{Adaptive} performs well 
-when the intersection concentrates in a small range while \texttt{Sequential} is good at the situation where intersection contains a small number of comparisons \cite{Barbay2006Faster}.
+While the two algorithms have same theoretical time complexity, an experimental study shows that \texttt{Adaptive} performs well when the intersection concentrates in a small range while \texttt{Sequential} is good at the situation where intersection contains a small number of comparisons \cite{Barbay2006Faster}.
 % 改进有small，expolation search
 Demaine et al. proposed a hybrid algorithm named \texttt{Small\_Adaptive}, which combines the best properties of \texttt{SvS} and \texttt{Adaptive} \cite{Demaine2001Experiments}.
 The sets are reordered based on the remaining size of each sets, and the eliminator is picked from the next value of the smallest one.
@@ -380,6 +379,37 @@ So we only consider modifying the searching algorithms, among which Golomb Searc
 			}
 			$ i = i $++$ \mod |q| $\;
 		}
+	\textbf{return} $ A $\;
+\end{algorithm}
+
+\begin{algorithm} \label{alg: test}
+	%	\SetAlgoNoLine
+	\caption{Multiple Sets Intersection Algorithm Pseudo Code}
+%	\KwIn{A list of $ |q| $ ordered inverted lists $ S_1,\dots,S_{|q|} $.
+%	}
+%	\KwOut{An orderted lists of answer $ A $.}
+	\While{$ list[i-1+T]<e $}{$ j=j+T $\;}
+	\While{$ list[i*T-1]<e $}{$ j=j*2 $\;}
+	binary search $ [i/2*T,i*t] $ to narrow it down to $ [t,t+T] $\;
+	$ i = 0; e = S_1[0] $\;
+	\While{$ S_i $ is not empty}{
+		use \textit{\textbf{F-Search}} to find the minimum value $ x $ which is not less than $ e $\;
+		\If{$ x == e $}{
+			increase the occurrence counter\;
+			\If{the count reaches $ |q| $}{
+				add $ e $ to the result set $ A $\;
+				\textit{\textbf{update}} $ e $\;
+			}
+			\Else{
+				$ i = i $++$ \mod |q| $\;
+				\textbf{continue}\;	
+			}
+		}
+		\Else{
+			\textit{\textbf{update}} $ e $\;	
+		}
+		$ i = i $++$ \mod |q| $\;
+	}
 	\textbf{return} $ A $\;
 \end{algorithm}
 
